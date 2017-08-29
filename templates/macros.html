@@ -1,0 +1,56 @@
+{% macro render_field(field) %}
+	{{ field ( placeholder=field.label.text, class='input-field form-control')}}
+	{% if field.errors %}
+		{% for error in field.errors %}
+			<p style='color: red'>{{ error }}</p>
+		{% endfor %}
+	{% endif %}
+{% endmacro %}
+
+{% macro render_message(message) %}
+
+	<li class='list-group-item'>
+		<div id='message-content'>
+			<p class='message-id' style='color: white; font-size: 0;'>{{ message.id}}</p>
+			<div id='message-header-container'>
+				<div id='message-username-container'>
+					<p>{{ message.user.username}}</p>
+				</div>
+				<div id='message-timestamp-container'>
+					<p>{{ message.timestamp.strftime('%I:%M:%S %p %m/%d/%Y') }}</p>
+				</div>
+			</div>
+			<p>{{ message.content }}</p>
+		</div>
+	</li>
+
+{% endmacro %}
+
+{% macro render_group_member(group_member) %}
+
+	<li class="list-group-item username-list-item">
+		<p><a class='username' href="{{ url_for('profile', username = group_member.user.username)}}">{{ group_member.user.username }}</a></p>
+		{% if group_member.active %}
+			<p class='status' style='color: green;'>Active <span class='glyphicon glyphicon-ok-sign' style='color: inherit;'></span></p>
+		{% else %}
+			<p class='status' style='color: grey;'>Inactive <span class='glyphicon glyphicon-remove-sign' style='color: inherit;'></span></p>
+		{% endif %}
+	</li>
+
+{% endmacro %}
+
+{% macro render_group(group) %}
+	{% if not group in current_user.get_groups() %} 
+		<h3 id='group-name'>{{ group.name}}</h3> 
+		<a href="{{ url_for('join_group', group_name = group.name)}}">join</a>
+	{% else %}
+		<a href="{{ url_for('group', id = group.id)}}"><h3>{{ group.name}}</h3></a>
+		{% if group.creator == current_user %}
+			<a class='anchor'href="{{ url_for('delete_group',group_name = group.name)}}">Delete</a>
+		{% else %}
+			<a class='anchor'href="{{ url_for('unjoin_group',group_name= group.name)}}">Unjoin</a>
+		{% endif %}
+	{% endif %}
+
+{% endmacro %}
+

@@ -1,0 +1,22 @@
+{% extends 'layout.html'%}
+{% from 'macros.html' import render_field %}
+{% block content %}
+    <form method="POST" action='/create-group'>
+			{{ form.hidden_tag()}}
+			{{ form.name( class='input-field form-control') }}
+			<p style='color: grey;'>Private group can only be accessed by your friends</p>
+			{{ form.private_group}}
+			private group
+			{% if form.private_group %}
+				{% for error in form.private_group.errors %}
+					<p style='color: red'>{{ error }}</p>
+				{% endfor %}
+			{% endif %}
+			{% if form.name %}
+				{% for error in form.name.errors %}
+					<p style='color: red'>{{ error }}</p>
+				{% endfor %}
+			{% endif %}
+			<button style='display: block;' type='submit'>Create group</button>
+    </form>
+{% endblock %}

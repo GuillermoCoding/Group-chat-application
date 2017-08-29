@@ -1,0 +1,337 @@
+{% extends 'layout.html' %}
+{% from 'macros.html' import render_message %}
+{% from 'macros.html' import render_group_member %}
+{% block content %}
+	<div id='modal-container' class='modal'>
+		<div class='modal-content'>
+			<span class='close'>&times;</span>
+			{% if group.creator == current_user %}
+				<p>Are you sure you want to delete the group?</p>
+			{% else %}
+				<p>Are you sure you want to leave the group?</p>
+			{% endif %}
+			<button id='confirm-button'>Confirm</button>
+		</div>
+	</div>
+	<div class='row'>
+		<div class='col-xs-12 col-sm-6 col-md-6'>
+			<h2 id='group-name'>{{ group.name }}</h2>
+		</div>
+		<div class='col-xs-12 col-sm-6 col-md-6'>
+			<div id='settings-dropdown-container'>
+				<div class="dropdown">
+					<button id='settings-button' class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+						<span class='glyphicon glyphicon-cog'></span> Settings
+						<span class="caret"></span>
+					</button>
+					<ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+						<li>
+							{% if group.creator == current_user %}
+									<a id='delete-group'style='color: red;' href="#">
+										Delete group
+									</a>
+								{% else %}
+									<a id='leave-group'style='color: red;' href="#">
+										Leave group
+									</a>
+								{% endif %}	
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</div>
+	<hr/>
+	<div class='row'>
+		<div class='col-xs-12 col-sm-8 col-md-8' style='margin-left: 1%;'>
+			<div class='panel panel-info'>
+				<div class="panel-heading"><h4>Group Chat</h4></div>
+				<div id='scroll'>
+					{% if group.number_of_total_messages() > 20 %}
+						<li id = 'load-more-item'class='list-group-item'><a id='load-more' href='#'>load more</a></li>
+					{% endif %}
+					<ul id='messages' class="list-group">
+					{% for message in group.get_messages() %}
+						{{ render_message(message)}}
+					{% endfor %}
+					{% with messages = get_flashed_messages(with_categories=True) %}
+						{% if messages %}
+							{% for category,message in messages %}
+							<li id='flash-message'>
+								<h4>{{ message }}</h4>
+							</li>
+							{% endfor %}
+						{% endif %}
+					{% endwith %}
+					</ul>
+				</div>
+				
+			</div>
+			<p style='color: grey;'id='typing-display'></p>
+			<form method='POST', action='/group-message'>
+				<input id='message' type='text' autocomplete="off" />
+				<button id ='send-button' type='submit' class='btn btn-success'>SEND <span class='glyphicon glyphicon-send'></span></button>
+			</form>
+		</div>
+		
+		<div class='col-xs-12 col-sm-3 col-md-3' style='margin-left: 3%;'>
+			<div id='group-members'>
+				<div class="panel panel-info">
+					<div class="panel-heading"><h4>Group members</h4></div>
+						<ul id='group-users' class="list-group">
+							{% for group_member in group.get_members() %}
+								{{ render_group_member(group_member) }}
+							{% endfor %}
+						</ul>
+				</div>
+			</div>
+		</div>
+	</div>	
+{% endblock %}
+
+{% block script %}
+<script src='https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.4.0/fullcalendar.min.js'></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.4.0/fullcalendar.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.4.0/fullcalendar.print.css">
+<script>
+	$(document).ready(function(){
+
+	const scroll = $('#scroll');
+	const height = scroll[0].scrollHeight;
+	scroll.scrollTop(height);
+
+	const socket = io.connect('/group');
+	const group = document.getElementById('group-name').textContent;
+
+	socket.on('connect',function(){
+		socket.emit('join',{
+			room : group
+		});
+		socket.on('user-unjoined',function(username){
+			const usernames = document.querySelectorAll('.username');
+			const statusTexts = document.querySelectorAll('.status');
+			for (let i = 0; i < usernames.length; i++) {
+				if (usernames[i].textContent == username) {
+					statusTexts[i].textContent = 'Inactive ';
+					statusTexts[i].style = 'color: grey;';
+					const span = document.createElement('span');
+					span.className = 'glyphicon glyphicon-remove-sign';
+					span.style = 'color: inherit;';
+					statusTexts[i].appendChild(span);
+				}
+			}
+		});
+			
+		socket.on('user-joined',function(username){
+			console.log(username+' should be active..');
+			const usernames = document.querySelectorAll('.username');
+			const statusTexts = document.querySelectorAll('.status');
+			for (let i = 0; i < usernames.length; i++) {
+				console.log('searching...'+usernames[i].textContent+' == '+username);
+				if (usernames[i].textContent == username) {
+					console.log(statusTexts[i].textContent);
+					statusTexts[i].textContent = 'Active ';
+					statusTexts[i].style = 'color: green;';
+					const span = document.createElement('span');
+					span.className = 'glyphicon glyphicon-ok-sign';
+					span.style = 'color: inherit;';
+					statusTexts[i].appendChild(span);
+				}
+			}
+		});
+		socket.on('user-join-group',function(data){
+			const groupUsers = document.getElementById('group-users');
+			const listItem = document.createElement('li');
+			listItem.className = 'list-group-item username-list-item';
+			listItem.innerHTML = "<p><a class='username' href='/profile/"+data+"'>"+data+"</a></p>"
+			+"<p class='status' style='color: grey'>Inactive <span class='glyphicon glyphicon-remove-sign' style='color: inherit;'></span></p>";
+			groupUsers.appendChild(listItem);
+		});
+		socket.on('user-unjoin-group',function(data){
+			const userListitems = document.getElementsByClassName('username-list-item');
+			const users = document.getElementsByClassName('username');
+			const usersList = document.getElementById('group-users');
+			for (let i = 0; i < users.length; i++) {
+				if (users[i].textContent == data) {
+					usersList.removeChild(users[i].parentNode.parentNode);
+				}
+			}
+		});
+		const message = document.getElementById('message');
+		let typing = false;
+		message.addEventListener('keypress',function(e){
+			if (e.code != 'Enter') {
+				if (typing == false) {
+					typing = true;
+					socket.emit('user-typing',{
+						room: group
+					});
+					timeout = setTimeout(notTyping, 600);
+				} else {
+					clearTimeout(timeout);
+					timeout = setTimeout(notTyping, 600);
+				}
+			}
+		});
+		function notTyping(){
+			typing = false;
+			socket.emit('user-not-typing',{
+				room : group
+			});
+		}
+		socket.on('user-typing-response',function(data){
+			const typingDisplay = document.getElementById('typing-display');
+			if (typingDisplay.textContent.length==0) {
+				typingDisplay.textContent = data+' is typing...'
+			}
+
+		})
+		socket.on('user-not-typing-response',function(data){
+			const typingDisplay = document.getElementById('typing-display');
+			if (typingDisplay.textContent.length=!0) {
+				typingDisplay.textContent = '';
+			}
+		})
+		const sendButton = document.getElementById('send-button');
+		sendButton.addEventListener('click',function(e){
+			const message = document.getElementById('message');
+			e.preventDefault();
+			if (message.value.length != 0) {
+				try {
+					const messages = document.getElementById('messages');
+					const flashMessage = document.getElementById('flash-message');
+					messages.removeChild(flashMessage);
+				} catch (err) {
+					console.log(err);
+				}
+				const group = document.getElementById('group-name').textContent;
+				socket.emit('message-send',{
+					message : message.value,
+					room : group
+				});
+				notTyping();
+				message.value = '';
+			} else {
+				alert('Invalid message, Please try again');
+			}
+		});
+		socket.on('load-more-response',function(data){
+			if (data.length == 0) {
+				const loadMoreItem = $('#load-more-item');
+				loadMoreItem.remove();
+				
+			} else {
+				for (let i = 0; i < data.length; i++) {
+					const message = document.createElement('li');
+					message.className = 'list-group-item';
+					message.innerHTML = "<div id='message-content'>"
+															+"<p class='message-id' style='color : white; font-size: 0;'>"+data[i].id+"</p>"
+															+"<div id='message-header-container'>"
+																+"<div id='message-/-container'>"
+																	+"<p>"+data[i].user+"</p>"
+																+"</div>"
+																+"<div id='message-timestamp-container'>"
+																	+"<p>"+data[i].timestamp+"</p>"
+																+"</div>"
+															+"</div>"
+															+"<p>"+data[i].content+"</p>"
+														+"</div>";
+					$('#messages').prepend(message);
+				}
+				const scroll = $('#scroll');
+				const height = -scroll[0].scrollHeight;
+				scroll.scrollTop(height);
+			}
+		});
+		socket.on('response',function(data){
+			const messages = document.getElementById('messages');
+			data = JSON.parse(data)
+			const message = document.createElement('li');
+			message.className = 'list-group-item';
+			message.innerHTML = "<div id='message-content'>"
+														+"<p class='message-id' style='color : white; font-size: 0;'>"+data.id+"</p>"
+														+"<div id='message-header-container'>"
+															+"<div id='message-username-container'>"
+																+"<p>"+data.user+"</p>"
+															+"</div>"
+															+"<div id='message-timestamp-container'>"
+																+"<p>"+data.timestamp+"</p>"
+															+"</div>"
+														+"</div>"
+														+"<p>"+data.content+"</p>"
+													+"</div>";
+			messages.appendChild(message);
+			const scroll = $('#scroll');
+			const height = scroll[0].scrollHeight;
+			scroll.scrollTop(height);
+		});
+		socket.on('group-deleted',function(data){
+			window.location.href = 'http://9fe38a2c.ngrok.io/profile';
+		});
+
+	});
+	
+	try {
+		const loadMore = document.getElementById('load-more');
+		loadMore.addEventListener('click',function(e){
+			const	messages = document.getElementById('messages');
+			const ids = document.querySelector('.message-id').textContent;
+			const group = document.getElementById('group-name').textContent;
+			socket.emit('load-more',{
+				groupName : group,
+				lastMessageId : parseInt(ids)
+			});
+		});
+	} catch (e) {
+
+	}
+	try {
+		const leaveGroup = document.getElementById('leave-group');
+		leaveGroup.addEventListener('click',function(e){
+			const modal = document.getElementById('modal-container');
+			modal.style.display = 'block';
+			const close = document.getElementsByClassName('close')[0];
+			close.addEventListener('click',function(){
+				modal.style.display = 'none';
+			});
+			window.addEventListener('click',function(e){
+				if (e.target == modal ) {
+					modal.style.display = 'none';
+				}
+			});
+			const confirmButton = document.getElementById('confirm-button');
+			confirmButton.addEventListener('click',function(){
+				const group = document.getElementById('group-name').textContent;
+				window.location.href= 'http://9fe38a2c.ngrok.io/unjoin-group/'+group; 
+			});
+		});
+	} catch (e) {
+
+	}
+	try {
+		const deleteGroup = document.getElementById('delete-group');
+		deleteGroup.addEventListener('click',function(e){
+			const modal = document.getElementById('modal-container');
+			modal.style.display = 'block';
+			const close = document.getElementsByClassName('close')[0];
+			close.addEventListener('click',function(){
+				modal.style.display = 'none';
+			});
+				window.addEventListener('click',function(e){
+				if (e.target == modal ) {
+					modal.style.display = 'none';
+				}
+			});
+			const confirmButton = document.getElementById('confirm-button');
+			confirmButton.addEventListener('click',function(){
+				const group = document.getElementById('group-name').textContent;
+				window.location.href= 'http://9fe38a2c.ngrok.io/delete-group/'+group; 
+			});
+		});
+	} catch (e) {
+
+	}
+})
+</script>
+{% endblock %}
